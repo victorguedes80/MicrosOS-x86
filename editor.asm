@@ -114,5 +114,5 @@ handle_enter:
     jmp type_loop
 
 exit_editor:
-    ret
+    jmp 0x1000:0
 
