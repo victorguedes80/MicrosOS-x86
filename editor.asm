@@ -1,37 +1,34 @@
+bits 16
 ; Editor de Texto - editor.asm
 ; Permite inserção e deleção de caracteres com proteção do cabeçalho e tela limpa.
-org 0x2000
+org 0
 
 first_editable_line equ 1   ; Linha 0: cabeçalho; Linha 1: primeira linha editável
 
-; --- Limpa a tela (assumindo 25 linhas x 80 colunas) ---
-mov ah, 06h
-mov al, 0        ; Número de linhas a rolar (0 = limpar toda a janela)
-mov bh, 07h      ; Atributo de cor (ex.: branco em fundo preto)
-mov cx, 0000h    ; Canto superior esquerdo (linha 0, coluna 0)
-mov dx, 184Fh    ; Canto inferior direito (linha 24, coluna 79)
-int 0x10
+start:
 
-; --- Posiciona o cursor no canto superior esquerdo ---
-mov ah, 02h
-mov bh, 0
-mov dh, 0
-mov dl, 0
-int 0x10
+    call limpa_tela
 
-; --- Exibe o cabeçalho "ED" na linha 0 ---
-mov ah, 0x0E
-mov al, 'E'
-int 0x10
-mov al, 'D'
-int 0x10
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
 
-; --- Posiciona o cursor na primeira linha editável (linha 1, coluna 0) ---
-mov ah, 02h
-mov bh, 0
-mov dh, first_editable_line
-mov dl, 0
-int 0x10
+    mov ss, ax
+    mov sp, 0x2000
+        
+    mov ax, 0x2000
+    mov ds, ax
+
+    mov si, editor_msg
+    mov cx, editor_msg_len
+    call print_str
+
+    ; --- Posiciona o cursor na primeira linha editável (linha 1, coluna 0) ---
+    mov ah, 02h
+    mov bh, 0
+    mov dh, first_editable_line
+    mov dl, 0
+    int 0x10
 
 ; --- Loop principal de leitura e exibição de caracteres ---
 type_loop:
@@ -114,5 +111,47 @@ handle_enter:
     jmp type_loop
 
 exit_editor:
+    call limpa_tela
+    
     jmp 0x1000:0
+
+
+limpa_tela:
+; --- Limpa a tela (assumindo 25 linhas x 80 colunas) ---
+    mov ah, 06h
+    mov al, 0        ; Número de linhas a rolar (0 = limpar toda a janela)
+    mov bh, 07h      ; Atributo de cor (ex.: branco em fundo preto)
+    mov cx, 0000h    ; Canto superior esquerdo (linha 0, coluna 0)
+    mov dx, 184Fh    ; Canto inferior direito (linha 24, coluna 79)
+    int 0x10
+
+; --- Posiciona o cursor no canto superior esquerdo ---
+    mov ah, 02h
+    mov bh, 0
+    mov dh, 0
+    mov dl, 0
+    int 0x10
+
+    ret
+
+    
+; -----------------------------------------------------------------------------
+; Função: print_str
+; Imprime a string cujo endereço está em SI e o tamanho em CX.
+; -----------------------------------------------------------------------------
+print_str:
+    pusha
+    mov ah, 0x0E        ; Serviço de escrita de caractere no TTY
+.char_loop:
+    lodsb               ; Carrega byte corrente de SI em AL e incrementa SI
+    int 0x10
+    loop .char_loop     ; Decrementa CX e repete até zerar
+    popa
+    ret
+; -----------------------------------------------------------
+; String e tamanho
+; -----------------------------------------------------------
+editor_msg db 'Digite ESC para sair', 0x0D, 0x0A
+editor_msg_len equ $ - editor_msg
+
 
